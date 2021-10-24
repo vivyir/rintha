@@ -1,0 +1,22 @@
+name: Rintha
+version: "0.1.0"
+about: Rintha is a mod manager based on modrinth with support for multiple profiles and more!
+author: phoenix_ir_ <ayitsmephoenix@airmail.cc>
+
+settings:
+  - SubcommandRequiredElseHelp
+
+subcommands:
+  - get:
+      about: Get mods from Modrinth (guided)
+      args:
+        - query:
+            help: Mod to search for
+            index: 1
+            required: true
+
+        - limit:
+            help: Optional limit, Max is 50
+            takes_value: true
+            short: l
+            long: limit
