@@ -891,8 +891,10 @@ dependencies = [
  "clap",
  "downloader",
  "femtorinth",
+ "serde",
  "sha-1",
  "shellexpand",
+ "thiserror",
 ]
 
 [[package]]

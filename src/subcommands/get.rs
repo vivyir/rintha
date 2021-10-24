@@ -1,10 +1,28 @@
-use crate::common::{shallow_search, version_list};
+use crate::common::{
+    mod_dir, shallow_search, version_list, ConfigMod, ModID, ModReleaseType, RinthaError, VersionID,
+};
 use bunt::{eprintln, print, println};
 use downloader::{Download, Downloader};
 use sha1::Digest;
 use std::{io::Write, mem};
 
 pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error::Error>> {
+    /* config mod variables to commit if tx successful */
+    let c_id: ModID;
+    let c_title: String;
+    let c_author_username: String;
+    let c_small_description: String;
+    let c_latest_mc_ver: String;
+    let c_license: String;
+    /* -------------Version related data-------------- */
+    let c_installed_version_id: VersionID;
+    let c_installed_version_number: String;
+    let c_installed_version_type: ModReleaseType;
+    let c_supported_game_versions: Vec<String>;
+    /* -----------VersionFile related data------------ */
+    let c_current_filename: String;
+    /* ----------------------------------------------- */
+
     let results = shallow_search(query, limit)?;
     for (n, i) in results.iter().enumerate() {
         println!(
@@ -23,19 +41,26 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
     std::io::stdout().flush()?;
     let mut string = String::new();
     std::io::stdin().read_line(&mut string)?;
-    let choice: usize = string.trim().parse()?;
+    let choice1: usize = string.trim().parse()?;
 
-    if choice >= results.len() {
+    if choice1 >= results.len() {
         eprintln!("{$bold}Choice was over the limit, exiting...{/$}");
         std::process::exit(-1);
     }
 
     println!(
         "{$bold}Getting info for \"{[yellow]}\"...{/$}\n",
-        results[choice].title
+        results[choice1].title
     );
 
-    let versions = version_list(results[choice].id.clone())?;
+    c_id = results[choice1].id.clone();
+    c_title = results[choice1].title.clone();
+    c_author_username = results[choice1].author_username.clone();
+    c_small_description = results[choice1].small_description.clone();
+    c_latest_mc_ver = results[choice1].latest_mc_ver.clone();
+    c_license = results[choice1].license.clone();
+
+    let versions = version_list(results[choice1].id.clone())?;
     if versions.len() >= 10 {
         println!("{$bold}10 or more results were returned, press enter after each 5 versions are shown to continue...{/$}");
     }
@@ -73,14 +98,19 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
     std::io::stdout().flush()?;
     let mut string = String::new();
     std::io::stdin().read_line(&mut string)?;
-    let choice: usize = string.trim().parse()?;
+    let choice2: usize = string.trim().parse()?;
 
-    if choice >= versions.len() {
+    if choice2 >= versions.len() {
         eprintln!("{$bold}Choice was over the limit, exiting...{/$}");
         std::process::exit(-1);
     }
 
-    let final_choice = versions[choice].clone();
+    c_installed_version_id = versions[choice2].id.clone();
+    c_installed_version_number = versions[choice2].version_number.clone();
+    c_installed_version_type = versions[choice2].version_type.clone();
+    c_supported_game_versions = versions[choice2].game_versions.clone();
+
+    let final_choice = versions[choice2].clone();
 
     println!("Downloading {[bold+yellow]}...", final_choice.name);
     let mut downloader = Downloader::builder()
@@ -110,10 +140,39 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
         } else {
             println!("{$bold}Verification:{/$} {$bold+red}Checked sha1 hash of downloaded mod, it doesn't match! cancelling transaction...{/$}");
             std::fs::remove_file(final_choice.files[0].filename.clone())?;
+            return Err(Box::new(RinthaError::BadFileHash));
         }
     } else {
         println!("{$bold+intense+red}NOTE{/$}: {$bold}No \"sha1\" hash exists for this mod, skipping verification...{/$}");
     }
+
+    c_current_filename = final_choice.files[0].filename.clone();
+
+    let mod_manifestation = ConfigMod {
+        id: c_id,
+        title: c_title,
+        author_username: c_author_username,
+        small_description: c_small_description,
+        latest_mc_ver: c_latest_mc_ver,
+        license: c_license,
+        installed_version_id: c_installed_version_id,
+        installed_version_number: c_installed_version_number,
+        installed_version_type: c_installed_version_type,
+        supported_game_versions: c_supported_game_versions,
+        current_filename: c_current_filename,
+    };
+
+    // FIXME: make this respect custom paths set in config
+    let mod_directory = match mod_dir() {
+        Ok(dir) => dir,
+        Err(err) => match err {
+            RinthaError::UnsupportedPlatform => {
+                println!("{$bold+red}Unsupported platform, no mod directory found...{/$}");
+                std::process::exit(-1);
+            }
+            _ => unreachable!(), // mod_dir only returns unsupported platform on failure.
+        },
+    };
 
     Ok(())
 }

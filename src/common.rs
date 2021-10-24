@@ -1,9 +1,102 @@
 use std::env::consts::OS;
 use std::path::{Path, PathBuf};
 
-pub use femtorinth::data_structures::{ModID, Version};
+pub use femtorinth::data_structures::{ModID, ModReleaseType, Version, VersionID};
 pub use femtorinth::version_list;
+use serde::{Deserialize, Serialize};
 use shellexpand::tilde;
+use thiserror::Error;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FullConfig {
+    pub custom_mod_dir: Option<String>,
+    pub profiles: Vec<Profile>,
+}
+
+impl Default for FullConfig {
+    fn default() -> Self {
+        FullConfig {
+            custom_mod_dir: None,
+            profiles: vec![Profile::default()],
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Profile {
+    pub name: String,
+    pub mods: Vec<ConfigMod>,
+}
+
+impl Default for Profile {
+    fn default() -> Self {
+        Profile {
+            name: "default_profile".into(),
+            mods: vec![ConfigMod::default()],
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConfigMod {
+    pub id: ModID,
+    pub title: String,
+    pub author_username: String,
+    pub small_description: String,
+    pub latest_mc_ver: String,
+    pub license: String,
+    pub installed_version_id: VersionID,
+    pub installed_version_number: String,
+    pub installed_version_type: ModReleaseType,
+    pub supported_game_versions: Vec<String>,
+    pub current_filename: String,
+}
+
+impl Default for ConfigMod {
+    fn default() -> Self {
+        ConfigMod {
+            id: ModID("".into()),
+            title: "".into(),
+            author_username: "".into(),
+            small_description: " field".into(),
+            latest_mc_ver: "".into(),
+            license: "".into(),
+            installed_version_id: VersionID("".into()),
+            installed_version_number: "".into(),
+            installed_version_type: ModReleaseType::Alpha,
+            supported_game_versions: vec!["".into()],
+            current_filename: "".into(),
+        }
+    }
+}
+
+pub trait ModChecking {
+    fn contains_mod(&self, mod_manifest: ConfigMod) -> bool;
+}
+
+impl ModChecking for Vec<ConfigMod> {
+    fn contains_mod(&self, mod_manifest: ConfigMod) -> bool {
+        if self.is_empty() {
+            return false;
+        } else {
+            let mut res = false;
+            for modif in self.iter() {
+                if modif.installed_version_number == mod_manifest.installed_version_number {
+                    res = true;
+                }
+            }
+            return res;
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum RinthaError {
+    #[error("The hash for the file did not match.")]
+    BadFileHash,
+    #[error("This platform isn't supported by Rintha.")]
+    UnsupportedPlatform,
+}
 
 #[derive(Debug, Clone)]
 pub struct ShallowSearchResult {
@@ -17,7 +110,7 @@ pub struct ShallowSearchResult {
     pub license: String,
 }
 
-pub fn mod_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
+pub fn mod_dir() -> Result<PathBuf, RinthaError> {
     let home = tilde("~");
     let home = Path::new(home.as_ref());
 
@@ -33,7 +126,7 @@ pub fn mod_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
             .join("Roaming")
             .join(".minecraft")
             .join("mods")),
-        _ => panic!("unsupported platform"), // FIXME: make into error instead of panic
+        _ => Err(RinthaError::UnsupportedPlatform),
     }
 }
 

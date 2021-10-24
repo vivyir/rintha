@@ -9,6 +9,7 @@ pub enum Subcommand {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /* cli handling code begin */
     let yaml = load_yaml!("cli.yaml");
     let app = App::from_yaml(yaml);
     let matches = app.get_matches();
@@ -34,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Subcommand::Get(query, limit) => subcommands::get(query, limit)?,
         Subcommand::Unknown => println!("No such subcommand."),
     }
+    /* cli handling code end */
 
     Ok(())
 }
