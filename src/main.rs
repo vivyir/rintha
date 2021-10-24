@@ -21,9 +21,9 @@ pub mod rintha {
         // FIXME: shite error handling
         let slimit;
         if let Some(ok) = limit {
-            slimit = Some(ok);
+            slimit = Some(ok + 1);
         } else {
-            slimit = Some(10);
+            slimit = Some(10 + 1);
         }
 
         let results = femtorinth::search_mods(query, None, slimit)?;
@@ -58,12 +58,16 @@ pub mod rintha {
 }
 
 use bunt::{eprintln, print, println};
+use downloader::{Download, Downloader};
+use sha1::Digest;
 use std::{io::Write, mem};
 
 use crate::rintha::{shallow_search, version_list};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let results = shallow_search("terra".into(), Some(25))?;
+    let query = std::env::args().nth(1).unwrap();
+
+    let results = shallow_search(query, None)?;
     for (n, i) in results.iter().enumerate() {
         println!(
             "{$bold+cyan}[{[blue]}]{/$} {[bold+yellow]} (by {[bold+blue]}): {[italic+cyan]}",
@@ -125,6 +129,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     mem::drop(tmp);
+
+    // FIXME: get a proper line reader
+    print!("{$bold}Enter your choice: {/$}");
+    std::io::stdout().flush()?;
+    let mut string = String::new();
+    std::io::stdin().read_line(&mut string)?;
+    let choice: usize = string.trim().parse()?;
+
+    if choice >= versions.len() {
+        eprintln!("{$bold}Choice was over the limit, exiting...{/$}");
+        std::process::exit(-1);
+    }
+
+    let final_choice = versions[choice].clone();
+
+    println!("Downloading {[bold+yellow]}...", final_choice.name);
+    let mut downloader = Downloader::builder()
+        .download_folder(std::path::Path::new("."))
+        .parallel_requests(1)
+        .build()?;
+
+    let modfile = Download::new(final_choice.files[0].url.as_str()).file_name(
+        std::path::Path::new(final_choice.files[0].filename.clone().as_str()),
+    );
+
+    let result = downloader.download(&[modfile])?;
+    for r in result {
+        match r {
+            Err(e) => println!("{$bold}Error occured!{/$} {[bold+red]}", e.to_string()),
+            Ok(s) => println!("{$bold}Success:{/$} {[bold+green]}", &s),
+        };
+    }
+
+    if let Some(hash) = final_choice.files[0].hashes.get("sha1") {
+        let modfile = std::fs::read(final_choice.files[0].filename.clone())?;
+        let sha1_hash = format!("{:x}", sha1::Sha1::digest(&modfile));
+        mem::drop(modfile);
+
+        if hash.to_owned() == sha1_hash {
+            println!("{$bold}Verification:{/$} {$bold+green}Checked sha1 hash of downloaded mod, it matches!{/$}");
+        } else {
+            println!("{$bold}Verification:{/$} {$bold+red}Checked sha1 hash of downloaded mod, it doesn't match! cancelling transaction...{/$}");
+            std::fs::remove_file(final_choice.files[0].filename.clone())?;
+        }
+    } else {
+        println!("{$bold+intense+red}NOTE{/$}: {$bold}No \"sha1\" hash exists for this mod, skipping verification...{/$}");
+    }
 
     Ok(())
 }
