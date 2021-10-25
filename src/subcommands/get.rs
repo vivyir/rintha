@@ -1,12 +1,17 @@
 use crate::common::{
-    mod_dir, shallow_search, version_list, ConfigMod, ModID, ModReleaseType, RinthaError, VersionID,
+    mod_dir, shallow_search, version_list, ConfigMod, FullConfig, ModID, ModReleaseType,
+    RinthaError, VersionID,
 };
 use bunt::{eprintln, print, println};
 use downloader::{Download, Downloader};
 use sha1::Digest;
 use std::{io::Write, mem};
 
-pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn get(
+    program_config: &mut FullConfig,
+    query: String,
+    limit: Option<usize>,
+) -> Result<(), Box<dyn std::error::Error>> {
     /* config mod variables to commit if tx successful */
     let c_id: ModID;
     let c_title: String;
@@ -14,6 +19,7 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
     let c_small_description: String;
     let c_latest_mc_ver: String;
     let c_license: String;
+    let c_sha1: String;
     /* -------------Version related data-------------- */
     let c_installed_version_id: VersionID;
     let c_installed_version_number: String;
@@ -107,7 +113,7 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
 
     c_installed_version_id = versions[choice2].id.clone();
     c_installed_version_number = versions[choice2].version_number.clone();
-    c_installed_version_type = versions[choice2].version_type.clone();
+    c_installed_version_type = versions[choice2].version_type;
     c_supported_game_versions = versions[choice2].game_versions.clone();
 
     let final_choice = versions[choice2].clone();
@@ -133,9 +139,10 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
     if let Some(hash) = final_choice.files[0].hashes.get("sha1") {
         let modfile = std::fs::read(final_choice.files[0].filename.clone())?;
         let sha1_hash = format!("{:x}", sha1::Sha1::digest(&modfile));
+        c_sha1 = sha1_hash.clone();
         mem::drop(modfile);
 
-        if hash.to_owned() == sha1_hash {
+        if *hash == sha1_hash {
             println!("{$bold}Verification:{/$} {$bold+green}Checked sha1 hash of downloaded mod, it matches!{/$}");
         } else {
             println!("{$bold}Verification:{/$} {$bold+red}Checked sha1 hash of downloaded mod, it doesn't match! cancelling transaction...{/$}");
@@ -143,7 +150,11 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
             return Err(Box::new(RinthaError::BadFileHash));
         }
     } else {
-        println!("{$bold+intense+red}NOTE{/$}: {$bold}No \"sha1\" hash exists for this mod, skipping verification...{/$}");
+        println!("{$bold+intense+red}NOTE{/$}: {$bold}No \"sha1\" hash exists for this mod, this mod is UNVERIFIED but a sha1 hash will be calculated for local integrity checks...{/$}");
+
+        let modfile = std::fs::read(final_choice.files[0].filename.clone())?;
+        let sha1_hash = format!("{:x}", sha1::Sha1::digest(&modfile));
+        c_sha1 = sha1_hash;
     }
 
     c_current_filename = final_choice.files[0].filename.clone();
@@ -155,6 +166,7 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
         small_description: c_small_description,
         latest_mc_ver: c_latest_mc_ver,
         license: c_license,
+        sha1: c_sha1,
         installed_version_id: c_installed_version_id,
         installed_version_number: c_installed_version_number,
         installed_version_type: c_installed_version_type,
@@ -173,6 +185,31 @@ pub fn get(query: String, limit: Option<usize>) -> Result<(), Box<dyn std::error
             _ => unreachable!(), // mod_dir only returns unsupported platform on failure.
         },
     };
+
+    {
+        // yes i know this is stupid and it does a lot of allocation
+        // but i don't know any other way to do it, please help (FIXME)
+        let current_prof = program_config.current_profile.as_str();
+        let mut edited_prof = program_config.profiles[current_prof].clone();
+
+        match edited_prof.add_mod(mod_manifestation) {
+            Ok(_) => (),
+            Err(err) => {
+                match err {
+                    RinthaError::ModAlreadyInstalled => {
+                        println!("{$bold+intense+red}Another version of this mod is already installed!{/$}");
+                        println!("{$bold}Please check `rintha list`.{/$}");
+                        std::process::exit(-1);
+                    }
+                    _ => unreachable!(), // add_mod only returns ModAlreadyInstalled on error
+                }
+            }
+        };
+
+        program_config
+            .profiles
+            .insert(current_prof.into(), edited_prof);
+    }
 
     Ok(())
 }

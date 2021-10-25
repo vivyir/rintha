@@ -1,5 +1,7 @@
 use clap::{load_yaml, App};
 
+use crate::common::FullConfig;
+
 mod common;
 mod subcommands;
 
@@ -9,7 +11,12 @@ pub enum Subcommand {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /* cli handling code begin */
+    /* configuration handling code begin */
+    let mut program_config: FullConfig = confy::load("rintha")?;
+    // TODO: integrity checks for the full config on load
+    /* configuration handling code end */
+
+    /* cli interface handling code begin */
     let yaml = load_yaml!("cli.yaml");
     let app = App::from_yaml(yaml);
     let matches = app.get_matches();
@@ -32,10 +39,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = command;
 
     match command {
-        Subcommand::Get(query, limit) => subcommands::get(query, limit)?,
+        Subcommand::Get(query, limit) => subcommands::get(&mut program_config, query, limit)?,
         Subcommand::Unknown => println!("No such subcommand."),
     }
-    /* cli handling code end */
+    /* cli interface handling code end */
 
+    confy::store("rintha", program_config)?;
     Ok(())
 }

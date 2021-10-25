@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env::consts::OS;
 use std::path::{Path, PathBuf};
 
@@ -10,34 +11,56 @@ use thiserror::Error;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FullConfig {
     pub custom_mod_dir: Option<String>,
-    pub profiles: Vec<Profile>,
+    pub current_profile: String,
+    pub config_revision: usize,
+    pub profiles: HashMap<String, Profile>,
 }
 
 impl Default for FullConfig {
     fn default() -> Self {
         FullConfig {
             custom_mod_dir: None,
-            profiles: vec![Profile::default()],
+            current_profile: "default".into(),
+            config_revision: 0,
+            profiles: HashMap::from([("default".into(), Profile::default())]),
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Profile {
     pub name: String,
-    pub mods: Vec<ConfigMod>,
+    pub mods: Option<Vec<ConfigMod>>,
 }
 
 impl Default for Profile {
     fn default() -> Self {
         Profile {
-            name: "default_profile".into(),
-            mods: vec![ConfigMod::default()],
+            name: "default".into(),
+            mods: None,
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+impl Profile {
+    pub fn add_mod(&mut self, cmod: ConfigMod) -> Result<(), RinthaError> {
+        let mods = &self.mods;
+        if mods.is_some() {
+            // its fine to unwrap because we already know it isn't None
+            if self.mods.as_mut().unwrap().contains_mod(cmod.clone()) {
+                Err(RinthaError::ModAlreadyInstalled)
+            } else {
+                self.mods.as_mut().unwrap().push(cmod);
+                Ok(())
+            }
+        } else {
+            self.mods = Some(vec![cmod]);
+            Ok(())
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConfigMod {
     pub id: ModID,
     pub title: String,
@@ -45,6 +68,7 @@ pub struct ConfigMod {
     pub small_description: String,
     pub latest_mc_ver: String,
     pub license: String,
+    pub sha1: String,
     pub installed_version_id: VersionID,
     pub installed_version_number: String,
     pub installed_version_type: ModReleaseType,
@@ -52,6 +76,9 @@ pub struct ConfigMod {
     pub current_filename: String,
 }
 
+/*
+ * disabled until further notice
+ *
 impl Default for ConfigMod {
     fn default() -> Self {
         ConfigMod {
@@ -69,6 +96,7 @@ impl Default for ConfigMod {
         }
     }
 }
+ */
 
 pub trait ModChecking {
     fn contains_mod(&self, mod_manifest: ConfigMod) -> bool;
@@ -77,15 +105,15 @@ pub trait ModChecking {
 impl ModChecking for Vec<ConfigMod> {
     fn contains_mod(&self, mod_manifest: ConfigMod) -> bool {
         if self.is_empty() {
-            return false;
+            false
         } else {
             let mut res = false;
             for modif in self.iter() {
-                if modif.installed_version_number == mod_manifest.installed_version_number {
+                if modif.id.0 == mod_manifest.id.0 {
                     res = true;
                 }
             }
-            return res;
+            res
         }
     }
 }
@@ -96,6 +124,8 @@ pub enum RinthaError {
     BadFileHash,
     #[error("This platform isn't supported by Rintha.")]
     UnsupportedPlatform,
+    #[error("This mod is already installed!")]
+    ModAlreadyInstalled,
 }
 
 #[derive(Debug, Clone)]
