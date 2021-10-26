@@ -5,10 +5,14 @@ author: phoenix_ir_ <ayitsmephoenix@airmail.cc>
 
 settings:
   - SubcommandRequiredElseHelp
+  - ColoredHelp
+  - GlobalVersion
 
 subcommands:
   - get:
       about: Get mods from Modrinth (guided)
+      settings:
+        - ColoredHelp
       args:
         - query:
             help: Mod to search for
