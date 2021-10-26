@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env::consts::OS;
 use std::path::{Path, PathBuf};
 
+use directories_next::ProjectDirs;
 pub use femtorinth::data_structures::{ModID, ModReleaseType, Version, VersionID};
 pub use femtorinth::version_list;
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,12 @@ impl Default for FullConfig {
             config_revision: 0,
             profiles: HashMap::from([("default".into(), Profile::default())]),
         }
+    }
+}
+
+impl FullConfig {
+    pub fn get_current_prof_path(&self) -> Result<PathBuf, RinthaError> {
+        Ok(profile_dir()?.join(self.current_profile.as_str()))
     }
 }
 
@@ -157,6 +164,14 @@ pub fn mod_dir() -> Result<PathBuf, RinthaError> {
             .join(".minecraft")
             .join("mods")),
         _ => Err(RinthaError::UnsupportedPlatform),
+    }
+}
+
+pub fn profile_dir() -> Result<PathBuf, RinthaError> {
+    if let Some(proj_dirs) = ProjectDirs::from("rs", "", "rintha") {
+        Ok(proj_dirs.config_dir().to_owned())
+    } else {
+        Err(RinthaError::UnsupportedPlatform)
     }
 }
 

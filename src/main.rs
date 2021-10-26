@@ -1,3 +1,4 @@
+use bunt::println;
 use clap::{load_yaml, App};
 
 use crate::common::FullConfig;
@@ -7,6 +8,7 @@ mod subcommands;
 
 pub enum Subcommand {
     Get(String, Option<usize>),
+    List { full: bool },
     Unknown,
 }
 
@@ -32,14 +34,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             );
         } else {
-            println!("Query must be longer than or equal to 3 characters.");
+            println!("{$bold+red}Error:{/$} {$bold}Query must be longer than or equal to 3 characters.{/$}");
             std::process::exit(-1);
+        }
+    } else if let Some(submatches) = matches.subcommand_matches("list") {
+        if submatches.is_present("full") {
+            command = Subcommand::List { full: true };
+        } else {
+            command = Subcommand::List { full: false };
         }
     }
     let command = command;
 
     match command {
         Subcommand::Get(query, limit) => subcommands::get(&mut program_config, query, limit)?,
+        Subcommand::List { full } => subcommands::list(&mut program_config, full)?,
         Subcommand::Unknown => println!("No such subcommand."),
     }
     /* cli interface handling code end */

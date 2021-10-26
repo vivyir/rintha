@@ -15,7 +15,7 @@ subcommands:
         - ColoredHelp
       args:
         - query:
-            help: Mod to search for
+            help: Mod to search for (and install)
             index: 1
             required: true
 
@@ -24,3 +24,12 @@ subcommands:
             takes_value: true
             short: l
             long: limit
+  - list:
+      about: List all installed mods
+      settings:
+        - ColoredHelp
+      args:
+        - full:
+            help: Flag for listing everything fully
+            short: f
+            long: full

@@ -5,7 +5,7 @@ use crate::common::{
 use bunt::{eprintln, print, println};
 use downloader::{Download, Downloader};
 use sha1::Digest;
-use std::{io::Write, mem};
+use std::{fs, io::Write, mem};
 
 pub fn get(
     program_config: &mut FullConfig,
@@ -211,5 +211,25 @@ pub fn get(
             .insert(current_prof.into(), edited_prof);
     }
 
+    println!("{$bold}Finalization...{/$}");
+    let filename = final_choice.files[0].filename.as_str();
+    fs::create_dir_all(program_config.get_current_prof_path()?)?;
+
+    println!("{$bold}Saving to profile directory...{/$}");
+    fs::copy(
+        filename,
+        program_config
+            .get_current_prof_path()
+            .unwrap()
+            .join(filename),
+    )?;
+
+    println!("{$bold}Saving to the minecraft mods directory...{/$}");
+    fs::copy(filename, mod_directory.as_path().join(filename))?;
+
+    println!("{$bold}Cleaning up...{/$}");
+    fs::remove_file(filename)?;
+
+    println!("{$bold+green}Successfully installed the mod!{/$}");
     Ok(())
 }
