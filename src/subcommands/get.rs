@@ -215,7 +215,10 @@ pub fn get(
     let filename = final_choice.files[0].filename.as_str();
     fs::create_dir_all(program_config.get_current_prof_path()?)?;
 
-    println!("{$bold}Saving to profile directory...{/$}");
+    println!(
+        "{$bold}Saving to profile directory... ({[yellow]}){/$}",
+        program_config.current_profile.as_str()
+    );
     fs::copy(
         filename,
         program_config

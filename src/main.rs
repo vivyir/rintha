@@ -1,4 +1,4 @@
-use bunt::println;
+use bunt::eprintln;
 use clap::{load_yaml, App};
 
 use crate::common::FullConfig;
@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
             );
         } else {
-            println!("{$bold+red}Error:{/$} {$bold}Query must be longer than or equal to 3 characters.{/$}");
+            eprintln!("{$bold+red}Error:{/$} {$bold}Query must be longer than or equal to 3 characters.{/$}");
             std::process::exit(-1);
         }
     } else if let Some(submatches) = matches.subcommand_matches("list") {
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match command {
         Subcommand::Get(query, limit) => subcommands::get(&mut program_config, query, limit)?,
-        Subcommand::List { full } => subcommands::list(&mut program_config, full)?,
+        Subcommand::List { full } => subcommands::list(&mut program_config, full),
         Subcommand::Unknown => println!("No such subcommand."),
     }
     /* cli interface handling code end */
