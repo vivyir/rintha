@@ -33,3 +33,22 @@ subcommands:
             help: Flag for listing everything fully
             short: f
             long: full
+  - remove:
+      about: Remove installed mods
+      settings:
+        - ArgRequiredElseHelp
+        - ColoredHelp
+      args:
+        - guided:
+            help: Remove a mod in guided mode
+            short: g
+            long: guided
+            conflicts_with:
+              - mod-id
+        - mod-id:
+            help: Remove a mod using its ID
+            short: m
+            long: mod-id
+            takes_value: true
+            conflicts_with:
+              - guided
